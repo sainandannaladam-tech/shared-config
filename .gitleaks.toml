@@ -1,0 +1,4 @@
+title = "shared-config secret scan"
+
+[extend]
+useDefault = true
