@@ -23,7 +23,7 @@ fake_private_key() {
 }
 
 fake_env_line() {
-  printf 'SERVICE_API_TOKEN=%s\n' "$(random_text 40)"
+  printf 'SERVICE_API_TOKEN=%s%s%s%s\n' 'Zq8Wv3Kp9X' 'r2Lm7Tn4Bc' 'H6yG1sJ5fD' 'Q0wP8kR3zN'
 }
 
 new_repo() {
