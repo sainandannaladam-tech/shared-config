@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly NO_COMMIT="0000000000000000000000000000000000000000"
+scan="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/secret-scan.sh"
+remote_name="$1"
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [[ "$local_sha" == "$NO_COMMIT" ]] && continue
+
+  if [[ "$remote_sha" == "$NO_COMMIT" ]]; then
+    range="$local_sha --not --remotes=$remote_name"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+
+  if ! "$scan" "$range"; then
+    echo "Push stopped: the secret scan found something. Remove it, or ask the owner to allow a false positive in .gitleaksignore." >&2
+    exit 1
+  fi
+done

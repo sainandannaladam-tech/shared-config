@@ -1,0 +1,72 @@
+# Fails a pull request unless it follows the owner's rules (PLAT-48, PLAT-50):
+#   branch  <KEY>-<n>-<short-description>  or  <KEY>-<n>-HOTFIX-<short-description>
+#   title   [<KEY>-<n>] <short description>  with " (toggled)" at the end if feature-toggled
+#   commits every commit message contains <KEY>-<n>
+#   body    every "## " heading of .github/pull_request_template.md is present;
+#           a (toggled) PR names its toggle under "## Feature toggle"
+# Canonical copy: the workspace repo. Set ALLOWED_KEYS per repo.
+# "jira-key" is a required status check in the "protect main" ruleset.
+name: jira-key
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  jira-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch, title, commits and description
+        env:
+          ALLOWED_KEYS: "PLAT"
+          BRANCH: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          branch_re="^((${ALLOWED_KEYS})-[1-9][0-9]*)-(HOTFIX-)?[a-z0-9]+(-[a-z0-9]+)*$"
+          [[ "$BRANCH" =~ $branch_re ]] || fail "Branch '$BRANCH' must be <KEY>-<n>-<short-description> or <KEY>-<n>-HOTFIX-<short-description>, KEY one of ${ALLOWED_KEYS}, description lowercase words joined by hyphens"
+          key="${BASH_REMATCH[1]}"
+
+          title_re="^\[${key}\] [^ ].*[^ ]$"
+          [[ "$TITLE" =~ $title_re ]] || fail "PR title must be '[${key}] <short description>', with ' (toggled)' at the end if the change is behind a feature toggle"
+          toggled=no
+          [[ "$TITLE" == *" (toggled)" ]] && toggled=yes
+
+          missing=$(gh api "repos/${REPO}/pulls/${PR}/commits" --paginate \
+            --jq ".[] | select(.commit.message | contains(\"${key}\") | not) | .sha[0:7]")
+          [[ -z "$missing" ]] || fail "These commits do not mention ${key}: ${missing}"
+
+          template=""
+          for ref in "$BASE_SHA" "$HEAD_SHA"; do
+            if template=$(gh api "repos/${REPO}/contents/.github/pull_request_template.md?ref=${ref}" --jq .content 2>/dev/null | base64 -d); then
+              [[ -n "$template" ]] && break
+            fi
+          done
+          [[ -n "$template" ]] || fail "No .github/pull_request_template.md in this repository"
+
+          body="${BODY//$'\r'/}"
+          absent=""
+          while IFS= read -r heading; do
+            grep -qxF "$heading" <<<"$body" || absent+="'${heading}' "
+          done < <(grep '^## ' <<<"$template")
+          [[ -z "$absent" ]] || fail "The description is missing these template sections: ${absent}"
+
+          if [[ "$toggled" == yes ]]; then
+            toggle_name=$(awk '/^## Feature toggle$/{f=1; next} /^## /{f=0} f' <<<"$body" \
+              | sed -n 's/^- Toggle name:[[:space:]]*//p' | head -1)
+            [[ -n "$toggle_name" && "$toggle_name" != "None" ]] || fail "The title says (toggled), so '## Feature toggle' must name the toggle ('- Toggle name: ...')"
+          fi
+
+          echo "OK: ${key}, toggled=${toggled}, all template sections present"
