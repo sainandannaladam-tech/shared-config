@@ -1,0 +1,53 @@
+{
+  "name": "@sainandannaladam-tech/shared-config",
+  "version": "1.0.0",
+  "description": "One shared Prettier, ESLint and TypeScript setup for every repository",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "exports": {
+    "./prettier": "./prettier.json",
+    "./tsconfig": "./tsconfig.base.json",
+    "./eslint": {
+      "types": "./dist/eslint/create-eslint-config.d.ts",
+      "default": "./dist/eslint/create-eslint-config.js"
+    }
+  },
+  "bin": {
+    "shared-config-verify": "dist/verify/cli.js"
+  },
+  "files": [
+    "dist",
+    "prettier.json",
+    "tsconfig.base.json"
+  ],
+  "prettier": "./prettier.json",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "test": "node --test \"tests/unit/**/*.test.ts\"",
+    "test:e2e": "npm run build && node --test \"tests/e2e/**/*.test.ts\"",
+    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run test:e2e"
+  },
+  "peerDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.15.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.15.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0"
+  }
+}
